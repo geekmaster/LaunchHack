@@ -1,0 +1,45 @@
+> ls
+leptonica-1.68  tesseract-3.01  tesseract-data  tiff-3.9.5
+
+Add the CodeSourcery's cross-compiler to the PATH.
+
+libtiff
+-------
+First clean-up:
+> make uninstall && make clean 
+
+> CFLAGS="-O3 -mcpu=arm1136jf-s -mfpu=vfp -mfloat-abi=softfp -I/mnt/us/launchhack/include" CXXFLAGS="-O3 -mcpu=arm1136jf-s -mfpu=vfp -mfloat-abi=softfp -I/mnt/us/launchhack/include" CXX=arm-none-linux-gnueabi-g++ CC=arm-none-linux-gnueabi-gcc AR=arm-none-linux-gnueabi-ar LDFLAGS="-L/mnt/us/launchhack/lib" ./configure --prefix=/mnt/us/launchhack --host=arm-none-linux-gnueabi --enable-rpath --libdir=/mnt/us/launchhack/lib
+
+The above makes a libtiff with rpath set to /mnt/us/launchhack/lib embedded.
+
+> make -j3 && make install
+
+leptonica
+---------
+> make uninstall && make clean 
+
+> CFLAGS="-O3 -mcpu=arm1136jf-s -mfpu=vfp -mfloat-abi=softfp -I/mnt/us/launchhack/include" CXXFLAGS="-O3 -mcpu=arm1136jf-s -mfpu=vfp -mfloat-abi=softfp -I/mnt/us/launchhack/include" CXX=arm-none-linux-gnueabi-g++ CC=arm-none-linux-gnueabi-gcc AR=arm-none-linux-gnueabi-ar LDFLAGS="-L/mnt/us/launchhack/lib -rpath=/mnt/us/launchhack/lib" LIBS='-ljpeg -lz' ./configure --prefix=/mnt/us/launchhack --host=arm-none-linux-gnueabi --libdir=/mnt/us/launchhack/lib --with-libtiff
+
+Note that jpeg and zlib are required in LIBS in order libtiff to be able to satisfy it's dependencies.
+
+> make -j3 && make install
+
+tesseract
+---------
+
+> CFLAGS="-O3 -mcpu=arm1136jf-s -mfpu=vfp -mfloat-abi=softfp -I/mnt/us/launchhack/include" CXXFLAGS="-O3 -mcpu=arm1136jf-s -mfpu=vfp -mfloat-abi=softfp -I/mnt/us/launchhack/include" CXX=arm-none-linux-gnueabi-g++ CC=arm-none-linux-gnueabi-gcc AR=arm-none-linux-gnueabi-ar LDFLAGS="-L/mnt/us/launchhack/lib " LIBS='-ltiff -ljpeg -lz' LIBLEPT_HEADERSDIR=/mnt/us/launchhack/include ./configure --prefix=/mnt/us/launchhack --host=arm-none-linux-gnueabi --libdir=/mnt/us/launchhack/lib
+
+In Ubuntu use 
+> bomstrip < strngs.h > strngs1.h; mv strngs1.h strngs.h 
+to remove the byte order mark.
+
+> make -j3 && make install
+
+Run on Kindle
+-------------
+Copy the .so.X.Y.Z libraries (not the symlinks) and rename them to .so.X.
+Copy the tesseract exe.
+Copy the models into /mnt/us/launchhack/share/tessdata.
+> export LD_LIBRARY_PATH="/mnt/us/launchhack/lib:/mnt/us/fbKindle/lib"
+Run 'tesseract img.tif test'.
+The result is in 'test.txt'

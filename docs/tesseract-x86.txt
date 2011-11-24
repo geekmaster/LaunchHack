@@ -1,0 +1,33 @@
+> ls
+leptonica-1.68  tesseract-3.01  tesseract-data  tiff-3.9.5
+
+libtiff
+-------
+./configure LDFLAGS=-L/mnt/us/x86/lib CFLAGS=-I/mnt/us/x86/include --prefix=/mnt/us/x86
+make
+make install
+
+leptonica
+---------
+./configure LDFLAGS=-L/mnt/us/x86/lib CFLAGS=-I/mnt/us/x86/include --prefix=/mnt/us/x86
+make
+make install
+
+tesseract
+---------
+./autogen.sh
+automake
+LDFLAGS=-L/mnt/us/x86/lib LIBLEPT_HEADERSDIR=/mnt/us/x86/include ./configure  --prefix=/mnt/us/x86
+make
+make install
+
+tesseract model data
+--------------------
+Download the english model (from e.g. http://tesseract-ocr.googlecode.com/files/tesseract-ocr-3.01.eng.tar.gz), extract and copy the contents to /mnt/us/x86/share/tessdata.
+
+Run
+---
+export LD_LIBRARY_PATH=/mnt/us/x86/lib
+cd /mnt/us/x86/bin
+./tesseract some_image.tif result_file_name
+
