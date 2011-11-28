@@ -2,7 +2,7 @@
 #include <fstream>
 
 #include "framegrabber.h"
-
+#include "ocr.h"
 
 int main(int argc, char **argv)
 {
@@ -26,6 +26,8 @@ int main(int argc, char **argv)
         bmdump.close();
     }
 #endif
+
+    RecognizeTitle(title);
 
     return 0;
 }

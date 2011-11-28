@@ -4,9 +4,6 @@
 #include <string>
 #include <fstream>
 
-//#include <fcntl.h>
-//#include <sys/ioctl.h>
-
 #include "linux/fb.h"
 #include "devicedefs.h"
 
@@ -20,7 +17,7 @@ struct Bitmap {
     {
         buffer_ = new char[((width*bpp)/8) * height];
         refcnt_ = new int;
-        ++ *refcnt_;
+        *refcnt_ = 1;
     }
 
     Bitmap(const Bitmap& other)
