@@ -4,47 +4,14 @@
 #include <string>
 #include <fstream>
 
+//#include <fcntl.h>
+//#include <sys/ioctl.h>
+
+#include "linux/fb.h"
+#include "devicedefs.h"
+
 namespace lhack {
 
-// Various dimensions relevant to DX devices
-struct KDXDimensions {
-    // Whole screen dimensions
-    static const int kScreenWidth = 824;
-    static const int kScreenHeight = 1200;
-
-    // ... and bits per pixel
-    static const int kBPP = 4;
-
-    // Number of titles per page
-    static const int kEntryPerPg = 15;
-
-    // Vertical offset of the topmost pixel of the 1st title
-    static const int kOffsetY = 161;
-
-    // Offset from the left margin of the first char in a title
-    static const int kOffsetX = 61;
-
-    // The gap between the underline of one title and the topmost pixels
-    // of the next.
-    static const int kEntryGap = 36;
-
-    // Maximum length of a title in pixels
-    static const int kEntryLen = 700;
-
-    // Maximum height of the title font
-    static const int kFontHeight = 16;
-
-    // Vertical distance in pixels from the bottommost pixel in a title to
-    // the bottommost pixel of the underlining squares
-    static const int kUlineBaseOffset = 12;
-
-    // The minimum distance from the font's baseline to the topmost pixels of the underline
-    static const int kUlineMinOffset = 7;
-
-    // The side length of the (bigger) underlining squares
-    //static const int kUlineSquareSz = 3;
-
-};
 
 // A bitmap to be passed around ...
 struct Bitmap {
@@ -125,6 +92,7 @@ public:
 
     /**
      * Try to find the selected (underlined) title and return its bitmap image.
+     * Check the result using IsValid() method of Bitmap.
      */
     Bitmap GrabSelected(int target_bpp);
 
@@ -143,7 +111,7 @@ Bitmap FrameGrabber<DIM>::GrabSelected(int target_bpp)
 
     int i, j;
     int bytes_row = (DIM::kScreenWidth * DIM::kBPP) / 8;
-    int bytes_skip =  bytes_row * DIM::kOffsetY; // skip the lines before the 1st title
+    int bytes_skip =  bytes_row * DIM::kOffsetYCol; // skip the lines before the 1st title
     int bytes_entry = bytes_row * (DIM::kFontHeight + DIM::kUlineBaseOffset + DIM::kEntryGap);
     int off_uline = bytes_row * (DIM::kFontHeight + DIM::kUlineBaseOffset + 1);
     int bytes_row_title = (DIM::kEntryLen * DIM::kBPP) / 8;
@@ -152,26 +120,50 @@ Bitmap FrameGrabber<DIM>::GrabSelected(int target_bpp)
     int check_start = ((DIM::kOffsetX + 2*sizeof(unsigned))*DIM::kBPP) / (8 * sizeof(unsigned));
     int check_len = ((DIM::kEntryLen - 2*sizeof(unsigned))*DIM::kBPP) / (8 * sizeof(unsigned));
 
-
     char *linebuf = new char[bytes_row];
 
     Bitmap title(DIM::kEntryLen, title_height, target_bpp);
 
     ifstream fb(fbdev_, ios::in | ios::binary);
 
-    for (i = 0; i < DIM::kEntryPerPg; i++) {
+    // Check whether we are browsing a collection
+    int entries_page = DIM::kEntryPerPgCol;
+    fb.seekg(bytes_row * DIM::kOffsetUlineCol);
+    fb.read(linebuf, bytes_row);
+    for (i = check_start; i < check_start + check_len; i++) {
+        if (((unsigned*) linebuf)[i] != DIM::kUlineColor) {
+            entries_page = DIM::kEntryPerPg;
+            bytes_skip = bytes_row * DIM::kOffsetY;
+            break;
+        }
+    }
+
+#ifdef LHACK_DEBUG_GRABBER
+    {
+        std::cout << "Entries per page: " << entries_page << std::endl;
+        ofstream chkdump("chkcollection.gray", ios::out | ios::binary);
+        chkdump.write(linebuf, bytes_row);
+        chkdump.close();
+
+    }
+#endif
+
+
+    for (i = 0; i < entries_page; i++) {
         // Check for the solid underline
         fb.seekg(bytes_skip + off_uline, ios::beg);
         fb.read(linebuf, bytes_row);
 #ifdef LHACK_DEBUG_GRABBER
-        char dumpfile[80];
-        snprintf(dumpfile, 80, "chkline%02d.gray", chkline_idx++);
-        ofstream chkdump(dumpfile, ios::out | ios::binary);
-        chkdump.write(linebuf, bytes_row);
-        chkdump.close();
+        {
+            char dumpfile[80];
+            snprintf(dumpfile, 80, "chkline%02d.gray", chkline_idx++);
+            ofstream chkdump(dumpfile, ios::out | ios::binary);
+            chkdump.write(linebuf, bytes_row);
+            chkdump.close();
+        }
 #endif
         for (j = check_start; j < check_start + check_len; j++) {
-            if (((unsigned*) linebuf)[j] != 0) {
+            if (((unsigned*) linebuf)[j] != DIM::kUlineColor) {
                 break;
             }
         }
@@ -180,6 +172,7 @@ Bitmap FrameGrabber<DIM>::GrabSelected(int target_bpp)
         if (j == check_start + check_len) {
             bytes_skip += (DIM::kOffsetX * DIM::kBPP) / 8;
             fb.seekg(bytes_skip, ios::beg);
+
             char *buffer = title.buffer();
             int buff_off = 0;
             for (int k = 0; k < title_height; k++) {
@@ -205,6 +198,7 @@ Bitmap FrameGrabber<DIM>::GrabSelected(int target_bpp)
         title.SetInvalid();
 
     delete[] linebuf;
+    fb.close();
 
     return title;
 }
