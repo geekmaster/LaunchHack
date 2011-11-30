@@ -57,6 +57,9 @@ struct KDXDimensions {
 
     // The color of the solid underline selection pointer
     static const unsigned kUlineColor = UINT_MAX;
+
+    // Maximum gap between words in a title beyond which next words are considered to be metadata
+    static const int kMaxBBGap = 33;
 };
 
 };
