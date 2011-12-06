@@ -1,13 +1,18 @@
 #include <iostream>
 #include <fstream>
+#include <vector>
+#include <string>
 
 #include "framegrabber.h"
 #include "ocr.h"
+#include "filematch.h"
+
+const unsigned kHashBins = 10111;
 
 int main(int argc, char **argv)
 {
     using namespace lhack;
-
+#if 0
     if (argc < 2) {
         std::cerr << "You should provide a gray image or fbdev as parameter" << std::endl;
         return 2;
@@ -29,6 +34,10 @@ int main(int argc, char **argv)
 
     Recognizer<KDXDimensions> ocr("/mnt/x86/share", "eng");
     std::cout << ocr.Recognize(image) << std::endl;
-
+#endif
+    std::vector<std::string> filters;
+    filters.push_back(string("*.pdf"));
+    Search("/home/vassil/Documents/Kindle/AllDocs", filters,
+           "Mining of massive datasets", 0.7);
     return 0;
 }
