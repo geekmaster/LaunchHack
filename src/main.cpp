@@ -1,3 +1,19 @@
+/*
+*   Copyright 2011 Vassil Panayotov <vd.panayotov@gmail.com>
+*
+*   Licensed under the Apache License, Version 2.0 (the "License");
+*   you may not use this file except in compliance with the License.
+*   You may obtain a copy of the License at
+*
+*       http://www.apache.org/licenses/LICENSE-2.0
+*
+*   Unless required by applicable law or agreed to in writing, software
+*   distributed under the License is distributed on an "AS IS" BASIS,
+*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+*   See the License for the specific language governing permissions and
+*   limitations under the License.
+*/
+
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -7,21 +23,26 @@
 #include "ocr.h"
 #include "filematch.h"
 
-const unsigned kHashBins = 10111;
-
 int main(int argc, char **argv)
 {
     using namespace lhack;
-#if 0
-    if (argc < 2) {
-        std::cerr << "You should provide a gray image or fbdev as parameter" << std::endl;
+    if (argc < 4) {
+        std::cerr << "Syntax: lhack rootdir comma-sep-filters similarity-coeff" << std::endl;
         return 2;
     }
-    //const char *fbdev = "/home/vassil/devel/vision/ocr/images/kindle/1.gray";
-    //const char *fbdev = "/dev/fb/0";
-    FrameGrabber<KDXDimensions> fgrab(argv[1]);
-    Bitmap image = fgrab.GrabSelected(8);
-    std::cout << "Bitmap valid? " << image.IsValid() << std::endl;
+
+    const char *fbdev = "/dev/fb/0";
+#ifdef LHACK_DEVEL_HOST
+    if (argc < 5) {
+        std::cerr << "You must provide a grayscale image as the final arg. to be used instead of fbdev\n";
+    }
+    fbdev = argv[4];
+#endif
+    FrameGrabber<KDXDimensions> fgrab(fbdev);
+    Bitmap image = fgrab.GrabSelected();
+    if (!image.IsValid())
+        return 2;
+
 #ifdef LHACK_DEBUG_GRABBER
     if (title.IsValid()) {
         char dmpname[80];
@@ -32,12 +53,36 @@ int main(int argc, char **argv)
     }
 #endif
 
+#ifdef LHACK_DEVEL_HOST
     Recognizer<KDXDimensions> ocr("/mnt/x86/share", "eng");
-    std::cout << ocr.Recognize(image) << std::endl;
+#else
+    Recognizer<KDXDimensions> ocr("/mnt/us/launchpad/share", "eng");
 #endif
+    string ocr_result = ocr.Recognize(image);
+
     std::vector<std::string> filters;
-    filters.push_back(string("*.pdf"));
-    Search("/home/vassil/Documents/Kindle/AllDocs", filters,
-           "Mining of massive datasets", 0.7);
+    char* fbegin = argv[2];
+    char* fend = fbegin;
+    while (*fend) {
+        if (*fend == ',') {
+            filters.push_back(string(fbegin, fend));
+            fbegin = ++fend;
+        }
+        else {
+            ++ fend;
+        }
+    }
+    if (fend > fbegin)
+        filters.push_back(string(fbegin, fend));
+
+    if (filters.empty())
+        return 2;
+
+    string match = Search(argv[1], filters, ocr_result, atof(argv[3]));
+    if (match.empty())
+        return 3;
+
+    std::cout << match << std::endl;
+
     return 0;
 }

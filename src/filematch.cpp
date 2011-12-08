@@ -1,3 +1,19 @@
+/*
+*   Copyright 2011 Vassil Panayotov <vd.panayotov@gmail.com>
+*
+*   Licensed under the Apache License, Version 2.0 (the "License");
+*   you may not use this file except in compliance with the License.
+*   You may obtain a copy of the License at
+*
+*       http://www.apache.org/licenses/LICENSE-2.0
+*
+*   Unless required by applicable law or agreed to in writing, software
+*   distributed under the License is distributed on an "AS IS" BASIS,
+*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+*   See the License for the specific language governing permissions and
+*   limitations under the License.
+*/
+
 #include <vector>
 #include <string>
 #include <utility>
@@ -36,7 +52,41 @@ typedef vector<index_atom_t> ngram_invert_t;
 
 typedef tr1::unordered_map<ngramid_t, ngram_invert_t, Identity> index_t;
 typedef vector<string> fullpaths_t;
+typedef vector<pair<ngramid_t, unsigned> > qfeat_t; // query features
 
+void
+PrintFeatures(const qfeat_t& feats)
+{
+    for (qfeat_t::const_iterator it = feats.begin(); it != feats.end(); it++) {
+        ngramid_t id = it->first;
+        char* idbytes = reinterpret_cast<char*>(&id);
+        cout << (idbytes[0]? idbytes[0]: '_') << ",";
+        cout << (idbytes[1]? idbytes[1]: '_') << ",";
+        cout << (idbytes[2]? idbytes[2]: '_');
+        cout << ": " << it->second << endl;
+    }
+}
+
+void
+PrintIndex(index_t& index)
+{
+    cout << "Index \n";
+    for (index_t::iterator it = index.begin(); it != index.end(); it++) {
+        cout << "ID: ";
+        ngramid_t id = it->first;
+        char* idbytes = reinterpret_cast<char*>(&id);
+        cout << (idbytes[0]? idbytes[0]: '_') << ",";
+        cout << (idbytes[1]? idbytes[1]: '_') << ",";
+        cout << (idbytes[2]? idbytes[2]: '_');
+        cout << "<" << id << "> [";
+        ngram_invert_t& invidx = it->second;
+        for (ngram_invert_t::iterator it2 = invidx.begin(); it2 != invidx.end(); it2++) {
+            cout << '(' << it2->first << ':' << it2->second << "), ";
+        }
+        cout << ']' << endl;
+    }
+    cout << "/Index \n";
+}
 
 /**
  * Extracts the base name of a file from abs. path.
@@ -62,7 +112,7 @@ FindBasename(const string& path, int *fnbase, int *fnlen)
     if (j < 0)
         return false;
 
-    *fnbase = i;
+    *fnbase = j + 1;
     *fnlen = i - j - 1;
 
     return true;
@@ -81,11 +131,12 @@ MakeIndex(const string& path, unsigned pathid,
 
     for (int i = fnbase; i < (fnbase + fnlen); i++) {
         ngbytes[3] = path[i];
-        ngram >> 8;
+        ngram >>= 8;
 
         index_t::iterator it = ngindex.find(ngram);
         if (it == ngindex.end()) { // is this the first time n-gram of this type is inserted?
-            ngram_invert_t invidx(20);
+            ngram_invert_t invidx;
+            invidx.reserve(20);
             invidx.push_back(make_pair(pathid, 1));
             ngindex.insert(make_pair(ngram, invidx));
         }
@@ -144,7 +195,7 @@ void QueryFeats(const string& query, vector<pair<ngramid_t, unsigned> >& out_fea
     char *ngbytes = reinterpret_cast<char*>(&ngramid);
     for(string::const_iterator it = query.begin(); it != query.end(); it++) {
         ngbytes[3] = *it;
-        ngramid >> 8;
+        ngramid >>= 8;
         ngids.push_back(ngramid);
     }
     sort(ngids.begin(), ngids.end());
@@ -160,6 +211,7 @@ void QueryFeats(const string& query, vector<pair<ngramid_t, unsigned> >& out_fea
             ++ count;
         }
     }
+    out_feats.push_back(make_pair(prev_id, count));
 }
 
 template <typename T1, typename T2>
@@ -190,12 +242,12 @@ int BestMatch(const string& query, int tau, index_t& ngindex)
 {
     // Extract the query's features
     typedef vector<pair<ngramid_t, unsigned> > feat_vec_t;
-    feat_vec_t feats(query.size());
+    feat_vec_t feats; feats.reserve(query.size());
     QueryFeats(query, feats);
 
     // Order the features from the rarest to the more common
     typedef vector<pair<ngramid_t, unsigned> > freq_vec_t;
-    freq_vec_t freqs(feats.size());
+    freq_vec_t freqs; freqs.reserve(feats.size());
     vector<pair<unsigned, unsigned> > freq2feat;
     unsigned zeros = 0, p = 0;
     for (feat_vec_t::iterator it = feats.begin(); it != feats.end(); it++) {
@@ -214,7 +266,7 @@ int BestMatch(const string& query, int tau, index_t& ngindex)
     sort(freq2feat.begin(), freq2feat.end(), CompareSecond<unsigned, unsigned>());
 
     // Make a short list of candidate file names
-    vector<index_atom_t> candidates(150); // the initial size is just a guess
+    vector<index_atom_t> candidates; candidates.reserve(150); // the initial size is just a guess
     int i = 0, f = 0;
     int signature_len = query.size() - tau - zeros + 1;
     if (signature_len < 1)
@@ -225,11 +277,14 @@ int BestMatch(const string& query, int tau, index_t& ngindex)
             unsigned featidx = freq2feat[i].first;
             candidates.push_back(make_pair(invit->first, min(invit->second, feats[featidx].second)));
         }
-        f += freqs[i++].second;
+        f += feats[freq2feat[i].first].second;
+        ++ i;
     }
 
     if (candidates.empty())
         return -1;
+
+    //cout << "Candidate array size: " << candidates.size() << endl;
 
     // Fold the list on pathid and put the entries in a list
     sort(candidates.begin(), candidates.end(), CompareFirst<pathid_t, unsigned>());
@@ -252,6 +307,9 @@ int BestMatch(const string& query, int tau, index_t& ngindex)
             }
         }
     }
+    candlist.push_back(make_pair(prev, count));
+
+    // cout << "Candidate list size: " << candlist.size() << endl;
 
     // For the rest of the features update the entries in the candidate list, while pruning those,
     // that don't have a chance of becoming the best candidate or fit within the similarity bounds
@@ -262,6 +320,7 @@ int BestMatch(const string& query, int tau, index_t& ngindex)
         list<index_atom_t>::iterator ilist = candlist.begin();
         while ( ilist != candlist.end()) {
             // Check if the candidate isn't prommising
+            //cout << "Current candidate: " << ilist->first << endl;
             unsigned cand_maxsim = ilist->second + max_sim;
             if (cand_maxsim < best_count || cand_maxsim < tau) {
                 candlist.erase(ilist++);
@@ -276,8 +335,10 @@ int BestMatch(const string& query, int tau, index_t& ngindex)
             ngram_invert_t::iterator lbit = lower_bound(
                         invidx.begin(), invidx.end(), *ilist,
                         CompareFirst<pathid_t, unsigned>());
-            if (lbit == invidx.end() || lbit->first != ilist->first)
+            if (lbit == invidx.end() || lbit->first != ilist->first) {
+                ++ ilist;
                 continue;
+            }
 
             ilist->second += min(lbit->second, feat_count);
             if (ilist->second > best_count) {
@@ -307,22 +368,13 @@ string Search(const string& fsroot, vector<string>& filters,
     int minlen = tau, maxlen = target.length();
     index_t index(10111);
     IndexFiles(fsroot, filters, fullpaths, index, minlen, maxlen);
-    cout << "All paths indexed: " << fullpaths.size() << endl;
-    ofstream fpaths;
-    fpaths.open("fullpaths.txt");
-    for (vector<string>::iterator it = fullpaths.begin(); it != fullpaths.end(); it++)
-        fpaths << *it << endl;
-    fpaths.close();
-#if 0
     int path = BestMatch(target, tau, index);
     if (path == -1) {
-        cout << "Not found\n";
         return string();
     }
     else {
         return fullpaths[path];
     }
-#endif
 }
 
 }; // namespace lhack

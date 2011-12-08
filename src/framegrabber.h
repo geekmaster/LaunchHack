@@ -1,3 +1,19 @@
+/*
+*   Copyright 2011 Vassil Panayotov <vd.panayotov@gmail.com>
+*
+*   Licensed under the Apache License, Version 2.0 (the "License");
+*   you may not use this file except in compliance with the License.
+*   You may obtain a copy of the License at
+*
+*       http://www.apache.org/licenses/LICENSE-2.0
+*
+*   Unless required by applicable law or agreed to in writing, software
+*   distributed under the License is distributed on an "AS IS" BASIS,
+*   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+*   See the License for the specific language governing permissions and
+*   limitations under the License.
+*/
+
 #ifndef FRAMEGRABBER_H
 #define FRAMEGRABBER_H
 
@@ -91,14 +107,14 @@ public:
      * Try to find the selected (underlined) title and return its bitmap image.
      * Check the result using IsValid() method of Bitmap.
      */
-    Bitmap GrabSelected(int target_bpp);
+    Bitmap GrabSelected();
 
 private:
     const char *fbdev_;
 };
 
 template <typename DIM >
-Bitmap FrameGrabber<DIM>::GrabSelected(int target_bpp)
+Bitmap FrameGrabber<DIM>::GrabSelected()
 {
     using namespace std;
 
@@ -119,7 +135,7 @@ Bitmap FrameGrabber<DIM>::GrabSelected(int target_bpp)
 
     char *linebuf = new char[bytes_row];
 
-    Bitmap title(DIM::kEntryLen, title_height, target_bpp);
+    Bitmap title(DIM::kEntryLen, title_height, 8);
 
     ifstream fb(fbdev_, ios::in | ios::binary);
 
@@ -175,10 +191,10 @@ Bitmap FrameGrabber<DIM>::GrabSelected(int target_bpp)
             for (int k = 0; k < title_height; k++) {
                 fb.read(linebuf, bytes_row_title);
 
-                // Convert the bit-depth (well ... it assumes a 4bpp FB and 8bpp target :)
+                // Convert the bit-depth. Assumes a 4bpp FB and 8bpp target
                 for (int h = 0; h < bytes_row_title; h++) {
                     buffer[buff_off++] = 0xf0 & linebuf[h];
-                    buffer[buff_off++] = linebuf[h] << 4; // << (target_bpp - DIM::kBPP)
+                    buffer[buff_off++] = linebuf[h] << 4;
                 }
 
                 bytes_skip += bytes_row;
