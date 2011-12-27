@@ -32,19 +32,26 @@ int main(int argc, char **argv)
     }
 
     const char *fbdev = "/dev/fb/0";
-#ifdef LHACK_DEVEL_HOST
+#if defined(LHACK_DEVEL_HOST)
     if (argc < 5) {
         std::cerr << "You must provide a grayscale image as the final arg. to be used instead of fbdev\n";
+        return 3;
     }
     fbdev = argv[4];
+    std::cout << "FB device: " << fbdev << std::endl;
 #endif
+
+#if defined(LHACK_K3)
+    FrameGrabber<K3Dimensions> fgrab(fbdev);
+#else
     FrameGrabber<KDXDimensions> fgrab(fbdev);
+#endif
     Bitmap image = fgrab.GrabSelected();
     if (!image.IsValid())
         return 2;
 
 #ifdef LHACK_DEBUG_GRABBER
-    if (title.IsValid()) {
+    if (image.IsValid()) {
         char dmpname[80];
         snprintf(dmpname, 80, "titledump-%dx%d.gray", image.width(), image.height());
         std::ofstream bmdump(dmpname);
@@ -53,12 +60,23 @@ int main(int argc, char **argv)
     }
 #endif
 
-#ifdef LHACK_DEVEL_HOST
+#if defined(LHACK_DEVEL_HOST)
+    #if defined(LHACK_K3)
+    Recognizer<K3Dimensions> ocr("/mnt/x86/share", "eng");
+    #else
     Recognizer<KDXDimensions> ocr("/mnt/x86/share", "eng");
+    #endif
 #else
+    #if defined(LHACK_K3)
+    Recognizer<K3Dimensions> ocr("/mnt/us/launchpad/share", "eng");
+    #else
     Recognizer<KDXDimensions> ocr("/mnt/us/launchpad/share", "eng");
+    #endif
 #endif
     string ocr_result = ocr.Recognize(image);
+#if defined(LHACK_DEVEL_HOST)
+    std::cout << "OCR result: " << ocr_result << std::endl;
+#endif
 
     std::vector<std::string> filters;
     char* fbegin = argv[2];

@@ -50,7 +50,9 @@ string Recognizer<DIM>::Recognize(Bitmap& image)
     api.Init(modeldir_.c_str(), lang_.c_str());
     api.SetImage((const unsigned char*)image.buffer(),
                  image.width(), image.height(), 1, image.width());
-    api.Recognize(0);
+    int ocr_error = api.Recognize(0);
+    if (ocr_error)
+        return string();
     tesseract::ResultIterator *it = api.GetIterator();
 
     int top, bottom, left=0, right=0;

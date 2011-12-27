@@ -140,10 +140,11 @@ Bitmap FrameGrabber<DIM>::GrabSelected()
     ifstream fb(fbdev_, ios::in | ios::binary);
 
     // Check whether we are browsing a collection
+    // (relies on the fact that the collection name's underline is longer)
     int entries_page = DIM::kEntryPerPgCol;
     fb.seekg(bytes_row * DIM::kOffsetUlineCol);
     fb.read(linebuf, bytes_row);
-    for (i = check_start; i < check_start + check_len; i++) {
+    for (i = check_start - 4; i < check_start + check_len + 3; i++) {
         if (((unsigned*) linebuf)[i] != DIM::kUlineColor) {
             entries_page = DIM::kEntryPerPg;
             bytes_skip = bytes_row * DIM::kOffsetY;
@@ -153,7 +154,10 @@ Bitmap FrameGrabber<DIM>::GrabSelected()
 
 #ifdef LHACK_DEBUG_GRABBER
     {
+        std::cout << "Bytes per line: " << bytes_row << std::endl;
+        std::cout << "Collection name underline offset: " << (bytes_row * DIM::kOffsetUlineCol) << std::endl;
         std::cout << "Entries per page: " << entries_page << std::endl;
+        std::cout << "Check length: " << check_len << std::endl;
         ofstream chkdump("chkcollection.gray", ios::out | ios::binary);
         chkdump.write(linebuf, bytes_row);
         chkdump.close();
